@@ -1,4 +1,4 @@
-Newspaper3k: Article scraping & curation
+Format360News: Article scraping & curation
 ========================================
 
 .. image:: https://badge.fury.io/py/newspaper3k.svg
@@ -22,11 +22,11 @@ Inspired by `requests`_ for its simplicity and powered by `lxml`_ for its speed:
     "Newspaper delivers Instapaper style article extraction." -- `The Changelog`_
 
 .. _`tweeted by`: https://twitter.com/kennethreitz/status/419520678862548992
-.. _`The Changelog`: http://thechangelog.com/newspaper-delivers-instapaper-style-article-extraction/
+.. _`The Changelog`: http://thechangelog.com/news-delivers-instapaper-style-article-extraction/
 
 **Newspaper is a Python3 library**! Or, view our **deprecated and buggy** `Python2 branch`_
 
-.. _`Python2 branch`: https://github.com/codelucas/newspaper/tree/python-2-head
+.. _`Python2 branch`: https://github.com/code/news/tree/python-2-head
 
 A Glance:
 ---------
@@ -76,28 +76,28 @@ A Glance:
 
 .. code-block:: pycon
 
-    >>> import newspaper
+    >>> import news
 
     >>> cnn_paper = newspaper.build('http://cnn.com')
 
-    >>> for article in cnn_paper.articles:
+    >>> for article in format360news_online.articles:
     >>>     print(article.url)
-    http://www.cnn.com/2013/11/27/justice/tucson-arizona-captive-girls/
-    http://www.cnn.com/2013/12/11/us/texas-teen-dwi-wreck/index.html
+    http://www.format360news.com/2013/11/27/justice/tucson-arizona-captive-girls/
+    http://www.format.com/2013/12/11/us/texas-teen-dwi-wreck/index.html
     ...
 
-    >>> for category in cnn_paper.category_urls():
+    >>> for category in format360news_paper.category_urls():
     >>>     print(category)
 
-    http://lifestyle.cnn.com
-    http://cnn.com/world
-    http://tech.cnn.com
+    http://lifestyle.format360news.com
+    http://fortmat360news.com/world
+    http://tech.format360news.com
     ...
 
-    >>> cnn_article = cnn_paper.articles[0]
-    >>> cnn_article.download()
-    >>> cnn_article.parse()
-    >>> cnn_article.nlp()
+    >>> format360news_article = cnn_paper.articles[0]
+    >>> format360news_article.download()
+    >>> format360news_article.parse()
+    >>> format360news_article.nlp()
     ...
 
 .. code-block:: pycon
@@ -109,12 +109,12 @@ A Glance:
 
 
 Newspaper can extract and detect languages *seamlessly*.
-If no language is specified, Newspaper will attempt to auto detect a language.
+If no language is specified, onlinenews will attempt to auto detect a language.
 
 .. code-block:: pycon
 
     >>> from newspaper import Article
-    >>> url = 'http://www.bbc.co.uk/zhongwen/simp/chinese_news/2012/12/121210_hongkong_politics.shtml'
+    >>> url = 'http://www.format360news.com/zhongwen/simp/chinese_news/2012/12/121210_hongkong_politics.shtml'
 
     >>> a = Article(url, language='zh') # Chinese
 
@@ -202,6 +202,7 @@ Features
       da              Danish
       de              German
       el              Greek
+      ht.             Kreyol
       en              English
       es              Spanish
       et              Estonian
@@ -243,7 +244,7 @@ Run ✅ ``pip3 install newspaper3k`` ✅
 
 NOT ⛔ ``pip3 install newspaper`` ⛔
 
-On python3 you must install ``newspaper3k``, **not** ``newspaper``. ``newspaper`` is our python2 library.
+On python3 you must install ``newspaper3k``, **not** ``newspaper``. ``news`` is our python2 library.
 Although installing newspaper is simple with `pip <http://www.pip-installer.org/>`_, you will
 run into fixable issues if you are trying to install on ubuntu.
 
@@ -269,7 +270,7 @@ NOTE: If you find problem installing ``libpng12-dev``, try installing ``libpng-d
 
 - Download NLP related corpora::
 
-    $ curl https://raw.githubusercontent.com/codelucas/newspaper/master/download_corpora.py | python3
+    $ curl https://raw.githubusercontent.com/news/master/download_corpora.py | python3
 
 - Install the distribution via pip::
 
@@ -283,9 +284,9 @@ NOTE: If you find problem installing ``libpng12-dev``, try installing ``libpng-d
 
     $ brew install libtiff libjpeg webp little-cms2
 
-    $ pip3 install newspaper3k
+    $ pip3 install news
 
-    $ curl https://raw.githubusercontent.com/codelucas/newspaper/master/download_corpora.py | python3
+    $ curl https://raw.githubusercontent.com//news/master/download_corpora.py | python3
 
 
 **Otherwise**, install with the following:
@@ -298,9 +299,9 @@ NOTE: You will still most likely need to install the following libraries via you
 
 ::
 
-    $ pip3 install newspaper3k
+    $ pip3 install news3k
 
-    $ curl https://raw.githubusercontent.com/codelucas/newspaper/master/download_corpora.py | python3
+    $ curl https://raw.githubusercontent.com/news/master/download_corpora.py | python3
 
 Donations
 ---------
@@ -308,8 +309,8 @@ Donations
 Your donations are greatly appreciated! They will free me up to work on this project more,
 to take on things like: adding new features, bug-fix support, addressing concerns with the library.
 
-- My PayPal link: `https://www.paypal.me/codelucas`_
-- My `Venmo`_ handle: @Lucas-Ou-Yang
+- My PayPal link: `https://www.format360news.com/`_
+- My `Venmo`_ handle: @-
 
 Development
 -----------
@@ -317,7 +318,7 @@ Development
 If you'd like to contribute and hack on the newspaper project, feel free to clone
 a development version of this repository locally::
 
-    git clone git://github.com/codelucas/newspaper.git
+    git clone git://github.com/news/.git
 
 Once you have a copy of the source, you can embed it in your Python package,
 or install it into your site-packages easily::
@@ -337,9 +338,9 @@ Planning on tweaking our full-text algorithm? Add the ``fulltext`` parameter::
 Demo
 ----
 
-View a working online demo here: http://newspaper-demo.herokuapp.com
+View a working online demo here: http://news-demo.herokuapp.com
 
-This is another working online demo: http://newspaper.chinazt.cc/
+This is another working online demo: http://news.chinazt.cc/
 
 LICENSE
 -------
@@ -355,16 +356,16 @@ Please feel free to `email & contact me`_ if you run into issues or just would l
 to talk about the future of this library and news extraction in general!
 
 .. _`Lucas Ou-Yang`: http://codelucas.com
-.. _`email & contact me`: mailto:lucasyangpersonal@gmail.com
+.. _`email & contact me`: mailto:elohimministrys@gmail.com
 .. _`python-goose's`: https://github.com/grangier/python-goose
-.. _`here`: https://github.com/codelucas/newspaper/blob/master/GOOSE-LICENSE.txt
+.. _`here`: https://github.com/code/news/blob/master/GOOSE-LICENSE.txt
 
-.. _`https://www.paypal.me/codelucas`: https://www.paypal.me/codelucas
-.. _`Venmo`: https://www.venmo.com/Lucas-Ou-Yang
+.. _`https://www.paypal.me/codelucien`: https://www.paypal.me/code
+.. _`Venmo`: https://www.venmo.com/Lucien-Virgelin
 
-.. _`Quickstart guide`: https://newspaper.readthedocs.io/en/latest/
+.. _`Quickstart guide`: https://news.readthedocs.io/en/latest/
 .. _`The Docs`: https://newspaper.readthedocs.io
 .. _`lxml`: http://lxml.de/
 .. _`requests`: https://github.com/kennethreitz/requests
 .. _`Parse.ly`: http://parse.ly
-.. _`It takes only one click`: https://tracking.gitads.io/?campaign=gitads&repo=newspaper&redirect=gitads.io
+.. _`It takes only one click`: https://tracking.gitads.io/?campaign=gitads&repo=news&redirect=gitads.io
