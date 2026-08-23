@@ -12,11 +12,12 @@ __license__ = 'MIT'
 __copyright__ = 'Copyright 2014, Lucas Ou-Yang'
 
 import copy
+import json
 import logging
 import os.path
 import re
-import re
 from collections import defaultdict
+from datetime import datetime
 
 from dateutil.parser import parse as date_parser
 from tldextract import tldextract
@@ -26,6 +27,11 @@ from . import urls
 from .utils import StringReplacement, StringSplitter
 
 log = logging.getLogger(__name__)
+
+# Anchors the fields a partial date leaves unspecified. Without it dateutil
+# fills them from the current moment, which makes '2014/04' resolve to a
+# different day depending on when you run it.
+DATE_DEFAULT = datetime(1, 1, 1)
 
 MOTLEY_REPLACEMENT = StringReplacement("&#65533;", "")
 ESCAPED_FRAGMENT_REPLACEMENT = StringReplacement(
@@ -183,18 +189,18 @@ class ContentExtractor(object):
         def parse_date_str(date_str):
             if date_str:
                 try:
-                    return date_parser(date_str)
+                    # An explicit default matters more than it looks. Given
+                    # '2014/04' dateutil fills the missing day from TODAY, so
+                    # the same page yields a different date depending on when it
+                    # is parsed, and re-running an extraction silently moves the
+                    # answer. The 1st is the honest reading of a year-month.
+                    return date_parser(date_str, default=DATE_DEFAULT)
                 except (ValueError, OverflowError, AttributeError, TypeError):
-                    # near all parse failures are due to URL dates without a day
-                    # specifier, e.g. /2014/04/
                     return None
 
-        date_match = re.search(urls.STRICT_DATE_REGEX, url)
-        if date_match:
-            date_str = date_match.group(0)
-            datetime_obj = parse_date_str(date_str)
-            if datetime_obj:
-                return datetime_obj
+        datetime_obj = parse_date_str(self._get_url_date(url))
+        if datetime_obj:
+            return datetime_obj
 
         PUBLISH_DATE_TAGS = [
             {'attribute': 'property', 'value': 'rnews:datePublished',
@@ -219,6 +225,12 @@ class ContentExtractor(object):
              'content': 'datetime'},
             {'attribute': 'name', 'value': 'publish_date',
              'content': 'content'},
+            {'attribute': 'name', 'value': 'date',
+             'content': 'content'},
+            {'attribute': 'name', 'value': 'dc.date',
+             'content': 'content'},
+            {'attribute': 'name', 'value': 'dcterms.created',
+             'content': 'content'},
         ]
         for known_meta_tag in PUBLISH_DATE_TAGS:
             meta_tags = self.parser.getElementsByTag(
@@ -232,6 +244,114 @@ class ContentExtractor(object):
                 datetime_obj = parse_date_str(date_str)
                 if datetime_obj:
                     return datetime_obj
+
+        # Schema.org JSON-LD, which is where most modern site generators put the
+        # date and where none of the meta tags above will find it. Tried after
+        # them so no existing page changes its answer, and before the raw text
+        # heuristics because a declared datePublished beats a regex over prose.
+        datetime_obj = parse_date_str(self._get_ld_json_date(doc))
+        if datetime_obj:
+            return datetime_obj
+
+        # <time datetime="..."> is the plain-HTML way to say the same thing.
+        # Only a time element the document marks as the publication date counts:
+        # a bare <time> is as likely to be a comment timestamp or a reading time.
+        for time_tag in self.parser.getElementsByTag(doc, tag='time'):
+            if self.parser.getAttribute(time_tag, 'pubdate') is None and \
+                    'publish' not in (
+                        self.parser.getAttribute(time_tag, 'itemprop') or
+                        self.parser.getAttribute(time_tag, 'class') or ''
+                    ).lower():
+                continue
+            datetime_obj = parse_date_str(
+                self.parser.getAttribute(time_tag, 'datetime'))
+            if datetime_obj:
+                return datetime_obj
+
+        return None
+
+    def _get_url_date(self, url):
+        """Find a publication date in the URL path, or None.
+
+        This replaced a bare STRICT_DATE_REGEX search, which was wrong in both
+        directions.
+
+        It missed real dates: the regex captures the separators around the
+        match, so '/2014/04/' arrived as '2014/04/' and dateutil raises on the
+        trailing slash. Every year-month URL fell through, and a page with no
+        date metadata then had no date at all. The old comment blamed the
+        missing day specifier and sent everyone looking in the wrong place —
+        date_parser('2014/04') is fine, date_parser('2014/04/') is not.
+
+        And it invented dates that were not there, which is the worse
+        direction: 'kali-linux-2026-1-release' and a '...-2026-07-...' API
+        version both look like dates to a regex that scans anywhere in the
+        string. Those only ever parsed by accident, because the same trailing
+        separator that hid the real dates also hid them.
+
+        The discriminator is position, not shape. A date in a URL owns the start
+        of its path segment — '/2013/03/slug', '/2025-10-registry-directory' —
+        while a version buried in a slug does not.
+        """
+        segments = [seg for seg in urlparse(url).path.split('/') if seg]
+
+        for index, segment in enumerate(segments):
+            # '2013/03/slug' and '2013/03/04/slug': consecutive numeric
+            # segments, which is the shape almost every blog engine emits.
+            if re.fullmatch(r'(19|20)\d{2}', segment):
+                parts = [segment]
+                for following in segments[index + 1:index + 3]:
+                    if not re.fullmatch(r'\d{1,2}', following):
+                        break
+                    parts.append(following)
+                if len(parts) > 1:
+                    return '-'.join(parts)
+                continue
+
+            # '2025-10-registry-directory', '2026-08-21-the-new-experience':
+            # the date opens the segment and a slug follows it.
+            match = re.match(
+                r'(19|20)\d{2}[-_.](\d{1,2})([-_.](\d{1,2}))?(?![0-9])', segment)
+            if match:
+                return match.group(0).rstrip('-_.').replace('_', '-') \
+                    .replace('.', '-')
+
+        return None
+
+    def _get_ld_json_date(self, doc):
+        """Pull datePublished out of any schema.org JSON-LD block.
+
+        The payload is author-controlled, so every shape here is one seen in the
+        wild: a bare object, a list of them, or a @graph wrapper. Malformed JSON
+        is common enough that it must never propagate — a page with a broken
+        script block still has the other strategies.
+        """
+        def find_date(node):
+            if isinstance(node, dict):
+                for key in ('datePublished', 'dateCreated'):
+                    value = node.get(key)
+                    if isinstance(value, str) and value.strip():
+                        return value
+                for nested in node.values():
+                    found = find_date(nested)
+                    if found:
+                        return found
+            elif isinstance(node, list):
+                for item in node:
+                    found = find_date(item)
+                    if found:
+                        return found
+            return None
+
+        for script in self.parser.getElementsByTag(
+                doc, tag='script', attr='type', value='application/ld+json'):
+            try:
+                payload = json.loads(self.parser.getText(script))
+            except (ValueError, TypeError):
+                continue
+            found = find_date(payload)
+            if found:
+                return found
 
         return None
 
