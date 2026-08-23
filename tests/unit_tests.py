@@ -554,6 +554,39 @@ class ContentExtractorTestCase(unittest.TestCase):
             '2015-05-05 00:00:00',
             str(self._get_publishing_date('https://x.dd/p', html)))
 
+    def test_get_publishing_date_prefers_page_metadata_over_a_year_month_url(self):
+        # A '/2019/07/' URL rounds to the 1st, so a page that states its own
+        # date must win — otherwise supabase's post moves from 2022-03-25 back
+        # to 2019-07-01, which is 2019 only because the slug lives there.
+        url = 'https://supabase.com/blog/2019/07/should-i-open-source-my-company'
+        for html in [
+            '<meta property="article:published_time" content="2022-03-25"/>',
+            '<script type="application/ld+json">'
+            '{"datePublished":"2022-03-25"}</script>',
+            '<time itemprop="datePublished" datetime="2022-03-25">x</time>',
+        ]:
+            self.assertEqual(
+                '2022-03-25 00:00:00',
+                str(self._get_publishing_date(url, html)), html)
+
+    def test_get_publishing_date_prefers_a_full_url_date_over_page_metadata(self):
+        # A URL that names the day is as precise as the page's own claim, and
+        # unlike shared template metadata it is per-article.
+        self.assertEqual(
+            '2026-08-21 00:00:00',
+            str(self._get_publishing_date(
+                'https://techcrunch.com/2026/08/21/some-post/',
+                '<meta property="article:published_time" content="2022-03-25"/>')))
+
+    def test_get_publishing_date_falls_back_to_a_year_month_url(self):
+        # Still the last resort: a page with no date of its own keeps the date
+        # its URL carries rather than none at all.
+        self.assertEqual(
+            '2019-07-01 00:00:00',
+            str(self._get_publishing_date(
+                'https://supabase.com/blog/2019/07/should-i-open-source-my-company',
+                '<time datetime="2022-03-25">5 min read</time>')))
+
 
 
 class SourceTestCase(unittest.TestCase):

@@ -177,13 +177,22 @@ class ContentExtractor(object):
         # return authors
 
     def get_publishing_date(self, url, doc):
-        """3 strategies for publishing date extraction. The strategies
-        are descending in accuracy and the next strategy is only
-        attempted if a preferred one fails.
+        """Strategies for publishing date extraction, in descending order of
+        accuracy. The next strategy is only attempted if a preferred one fails.
 
-        1. Pubdate from URL
+        1. Pubdate from the URL, when the URL names a day
         2. Pubdate from metadata
-        3. Raw regex searches in the HTML + added heuristics
+        3. Pubdate from schema.org JSON-LD, then a <time> publication element
+        4. Pubdate from the URL when it only names a year and a month
+
+        The URL is split across the first and last places on purpose. A URL
+        that names a day is as precise as anything the page can state, and it
+        cannot be poisoned by a template that stamps every page with the same
+        metadata. A '/2019/07/' URL is coarser than a datePublished the page
+        states about itself, so preferring it would push a page whose metadata
+        says 2022-03-25 back to 2019-07-01 — losing a date the page told us in
+        favour of one we rounded to the 1st. It is still better than no date at
+        all, so it stays as the last fallback.
         """
 
         def parse_date_str(date_str):
@@ -198,9 +207,13 @@ class ContentExtractor(object):
                 except (ValueError, OverflowError, AttributeError, TypeError):
                     return None
 
-        datetime_obj = parse_date_str(self._get_url_date(url))
-        if datetime_obj:
-            return datetime_obj
+        url_date_str = self._get_url_date(url)
+        # '2013-03-04' has a day, '2013-03' does not; only the former outranks
+        # what the page says about itself.
+        if url_date_str and url_date_str.count('-') == 2:
+            datetime_obj = parse_date_str(url_date_str)
+            if datetime_obj:
+                return datetime_obj
 
         PUBLISH_DATE_TAGS = [
             {'attribute': 'property', 'value': 'rnews:datePublished',
@@ -268,7 +281,9 @@ class ContentExtractor(object):
             if datetime_obj:
                 return datetime_obj
 
-        return None
+        # A year-month URL, now that nothing more precise has turned up. The
+        # day lands on the 1st; see parse_date_str for why it is not today's.
+        return parse_date_str(url_date_str)
 
     def _get_url_date(self, url):
         """Find a publication date in the URL path, or None.
