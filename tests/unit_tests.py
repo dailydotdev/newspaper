@@ -448,6 +448,92 @@ class ContentExtractorTestCase(unittest.TestCase):
             'https://example.com/meta_link_rel_icon.ico'
         )
 
+    def _get_publishing_date(self, url, html='<html><body></body></html>'):
+        return self.extractor.get_publishing_date(
+            url, self.parser.fromstring(html))
+
+    def test_get_publishing_date_from_url(self):
+        # Year-month paths are the common case and used to yield nothing at all:
+        # the regex captured the trailing separator and dateutil raised on it.
+        for url, expected in [
+            ('https://firebase.blog/posts/2013/03/power-your-extension',
+             '2013-03-01 00:00:00'),
+            ('https://mypy-lang.blogspot.com/2024/10/mypy-113-released.html',
+             '2024-10-01 00:00:00'),
+            ('https://techcrunch.com/2026/08/21/some-post/',
+             '2026-08-21 00:00:00'),
+            ('https://rubyonrails.org/2026/8/21/this-week-in-rails',
+             '2026-08-21 00:00:00'),
+            ('https://ui.shadcn.com/docs/changelog/2025-10-registry-directory',
+             '2025-10-01 00:00:00'),
+            ('https://github.blog/changelog/2026-08-21-the-new-experience',
+             '2026-08-21 00:00:00'),
+        ]:
+            self.assertEqual(expected, str(self._get_publishing_date(url)), url)
+
+    def test_get_publishing_date_ignores_versions_in_a_slug(self):
+        # A date owns the start of its path segment; a version buried in a slug
+        # does not. These parsed only by accident before, via the same trailing
+        # separator that hid the real dates.
+        for url in [
+            'https://www.kali.org/blog/kali-linux-2026-1-release/',
+            'https://shopify.dev/changelog/some-thing-2026-07-api-change',
+            'https://istio.io/latest/blog/2026/some-post/',
+            'https://example.com/no-date-at-all/',
+        ]:
+            self.assertIsNone(self._get_publishing_date(url), url)
+
+    def test_get_publishing_date_pins_the_day_of_a_year_month(self):
+        # dateutil fills an unspecified day from TODAY, so this asserts the
+        # answer does not depend on the day the test runs.
+        date = self._get_publishing_date('https://x.dd/blog/2013/03/slug')
+        self.assertEqual(1, date.day)
+
+    def test_get_publishing_date_from_ld_json(self):
+        for html, expected in [
+            ('<script type="application/ld+json">'
+             '{"@type":"BlogPosting","datePublished":"2017-01-25"}</script>',
+             '2017-01-25 00:00:00'),
+            ('<script type="application/ld+json">'
+             '{"@graph":[{"@type":"WebSite"},{"datePublished":"2019-06-02"}]}'
+             '</script>', '2019-06-02 00:00:00'),
+            ('<script type="application/ld+json">'
+             '[{"@type":"Person"},{"datePublished":"2021-11-09"}]</script>',
+             '2021-11-09 00:00:00'),
+        ]:
+            self.assertEqual(
+                expected, str(self._get_publishing_date('https://x.dd/p', html)))
+
+    def test_get_publishing_date_survives_malformed_ld_json(self):
+        # The payload is author-controlled, so a broken block must not stop the
+        # remaining strategies.
+        html = '<script type="application/ld+json">{oops,</script>'
+        self.assertIsNone(self._get_publishing_date('https://x.dd/p', html))
+
+    def test_get_publishing_date_from_time_element(self):
+        self.assertEqual(
+            '2018-04-03 00:00:00',
+            str(self._get_publishing_date(
+                'https://x.dd/p',
+                '<time datetime="2018-04-03" pubdate="pubdate">x</time>')))
+        self.assertEqual(
+            '2020-02-02 00:00:00',
+            str(self._get_publishing_date(
+                'https://x.dd/p',
+                '<time itemprop="datePublished" datetime="2020-02-02">x</time>')))
+        # A bare <time> is as likely to be a reading time or a comment stamp.
+        self.assertIsNone(self._get_publishing_date(
+            'https://x.dd/p', '<time datetime="2020-02-02">5 min read</time>'))
+
+    def test_get_publishing_date_prefers_meta_over_the_new_strategies(self):
+        html = ('<meta property="article:published_time" content="2015-05-05"/>'
+                '<script type="application/ld+json">'
+                '{"datePublished":"2001-01-01"}</script>')
+        self.assertEqual(
+            '2015-05-05 00:00:00',
+            str(self._get_publishing_date('https://x.dd/p', html)))
+
+
 
 class SourceTestCase(unittest.TestCase):
     @print_test
