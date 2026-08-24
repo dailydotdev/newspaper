@@ -525,6 +525,26 @@ class ContentExtractorTestCase(unittest.TestCase):
         self.assertIsNone(self._get_publishing_date(
             'https://x.dd/p', '<time datetime="2020-02-02">5 min read</time>'))
 
+    def test_publish_date_ignores_a_modification_date_meta(self):
+        # Meta names are matched by SUBSTRING, so a generic `date` entry matched
+        # `name="last-updated"` (up-DATE-d) and a dev.to article whose JSON-LD
+        # said 2021-08-02 came back as its 2024-01-12 modification date. The
+        # page's own datePublished must win over anything a modification stamp
+        # happens to look like.
+        html = (
+            '<html><head><title>T</title>'
+            '<meta name="last-updated" content="2024-01-12 13:13:27 UTC">'
+            '<script type="application/ld+json">'
+            '{"@type":"Article","datePublished":"2021-08-02T12:38:11Z"}'
+            '</script></head><body><article><p>%s</p></article></body></html>'
+        ) % ('Body text long enough to parse as an article. ' * 12)
+
+        article = Article('https://example.com/no-date-in-this-url')
+        article.download(input_html=html)
+        article.parse()
+
+        self.assertEqual('2021-08-02', article.publish_date.strftime('%Y-%m-%d'))
+
     def test_publish_date_from_ld_json_through_a_full_parse(self):
         # Through Article.parse rather than the extractor directly, because that
         # is where this broke: parse() used to hand over the CLEANED doc, whose
