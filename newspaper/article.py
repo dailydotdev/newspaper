@@ -280,9 +280,16 @@ class Article(object):
         meta_data = self.extractor.get_meta_data(self.clean_doc)
         self.set_meta_data(meta_data)
 
+        # The RAW doc, not the cleaned one: the document cleaner strips <script>
+        # tags, and schema.org JSON-LD lives in one. Passing clean_doc here meant
+        # the JSON-LD strategy could never fire through this path, silently — the
+        # URL and <meta> strategies still worked, so a page carrying only JSON-LD
+        # came back undated and looked like a page with no date at all. Every
+        # other strategy reads <head>, which the cleaner leaves alone, so the raw
+        # doc is a superset for this purpose.
         self.publish_date = self.extractor.get_publishing_date(
             self.url,
-            self.clean_doc)
+            self.doc)
 
         self.top_node = self.extractor.calculate_best_node(self.doc)
         if self.top_node is None:
