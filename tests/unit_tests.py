@@ -525,6 +525,27 @@ class ContentExtractorTestCase(unittest.TestCase):
         self.assertIsNone(self._get_publishing_date(
             'https://x.dd/p', '<time datetime="2020-02-02">5 min read</time>'))
 
+    def test_publish_date_from_ld_json_through_a_full_parse(self):
+        # Through Article.parse rather than the extractor directly, because that
+        # is where this broke: parse() used to hand over the CLEANED doc, whose
+        # <script> tags the document cleaner has already removed, so a page
+        # carrying its date only in JSON-LD came back undated. Calling the
+        # extractor with a freshly parsed doc — as every other test here does —
+        # cannot catch that.
+        html = (
+            '<html><head><title>T</title>'
+            '<script type="application/ld+json">'
+            '{"@type":"NewsArticle","datePublished":"2026-02-16T09:00:00-05:00"}'
+            '</script></head><body><article><p>%s</p></article></body></html>'
+        ) % ('Body text long enough to parse as an article. ' * 12)
+
+        article = Article('https://example.com/some-post-with-no-date-in-the-url')
+        article.download(input_html=html)
+        article.parse()
+
+        self.assertIsNotNone(article.publish_date)
+        self.assertEqual('2026-02-16', article.publish_date.strftime('%Y-%m-%d'))
+
     def test_get_publishing_date_prefers_meta_over_the_new_strategies(self):
         html = ('<meta property="article:published_time" content="2015-05-05"/>'
                 '<script type="application/ld+json">'
