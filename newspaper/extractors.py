@@ -215,6 +215,15 @@ class ContentExtractor(object):
             if datetime_obj:
                 return datetime_obj
 
+        # Names here are matched by SUBSTRING, not equality — getElementsByTag
+        # builds an xpath `contains(@name, value)`. That is survivable for the
+        # long, specific names below, and lethal for a short generic one: a
+        # `date` entry matches `name="last-updated"` (up-DATE-d), so a dev.to
+        # article whose JSON-LD says 2021-08-02 came back as its 2024-01-12
+        # modification date. A confidently wrong date is worse than none, so
+        # generic names (`date`, `dc.date`, `dcterms.created`) are deliberately
+        # absent; they would need equality matching to be safe, and JSON-LD
+        # below already covers the pages they were added for.
         PUBLISH_DATE_TAGS = [
             {'attribute': 'property', 'value': 'rnews:datePublished',
              'content': 'content'},
@@ -237,12 +246,6 @@ class ContentExtractor(object):
             {'attribute': 'pubdate', 'value': 'pubdate',
              'content': 'datetime'},
             {'attribute': 'name', 'value': 'publish_date',
-             'content': 'content'},
-            {'attribute': 'name', 'value': 'date',
-             'content': 'content'},
-            {'attribute': 'name', 'value': 'dc.date',
-             'content': 'content'},
-            {'attribute': 'name', 'value': 'dcterms.created',
              'content': 'content'},
         ]
         for known_meta_tag in PUBLISH_DATE_TAGS:
